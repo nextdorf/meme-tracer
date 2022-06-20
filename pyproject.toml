@@ -8,7 +8,7 @@ build-backend = "setuptools.build_meta" #Use setuptools for building
 name = "memetracer"
 description = "A tool for researching how image-memes spread through the internet. At the moment only memes on reddit are traced."
 readme = "README.md"
-keywords = ["meme", "memes", "reddit"]
+keywords = ["meme", "memes", "reddit", "research"]
 requires-python = ">=3"
 license = {text = "GPL-3.0-or-later"}
 classifiers = [
@@ -19,7 +19,6 @@ classifiers = [
   "Programming Language :: Python :: 3",
   "Intended Audience :: Science/Research",
 ]
-#version = "0.0.1"
 dependencies = [
   "praw",
   "pathlib",
@@ -31,7 +30,7 @@ dynamic = ["version"]
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = {attr = "memetracer._version"}
+version = {attr = "memetracer._version.version"}
 
 [tool.setuptools_scm]
 write_to = "src/memetracer/_version.py"
