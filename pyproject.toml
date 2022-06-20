@@ -1,0 +1,37 @@
+#See: https://setuptools.pypa.io/en/latest/userguide/quickstart.html, https://packaging.python.org/en/latest/tutorials/packaging-projects/
+
+[build-system]
+requires = ["setuptools>=42", "setuptools-scm"] # build-dependencies, might be deleted after building project
+build-backend = "setuptools.build_meta" #Use setuptools for building
+
+[project]
+name = "memetracer"
+description = "A tool for researching how image-memes spread through the internet. At the moment only memes on reddit are traced."
+readme = "README.md"
+keywords = ["meme", "memes", "reddit"]
+requires-python = ">=3"
+license = {text = "GPL-3.0-or-later"}
+classifiers = [
+  "Topic :: Games/Entertainment",
+  "Topic :: Scientific/Engineering",
+  "Development Status :: 1 - Planning",
+  "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+  "Programming Language :: Python :: 3",
+  "Intended Audience :: Science/Research",
+]
+#version = "0.0.1"
+dependencies = [
+  "praw",
+  "pathlib",
+]
+urls = {repository = "https://github.com/nextdorf/meme-tracer"}
+dynamic = ["version"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "memetracer._version"}
+
+[tool.setuptools_scm]
+write_to = "src/memetracer/_version.py"
