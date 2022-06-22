@@ -33,6 +33,7 @@
 \newcommand{\del}{\partial}
 \newcommand{\cev}[1]{\reflectbox{\ensuremath{\vec{\reflectbox{\ensuremath{#1}}}}}}
 
+
 \newcommand{\pushright}[1]{\ifmeasuring@#1\else\omit\hfill$\displaystyle#1$\fi\ignorespaces}
 \newcommand{\pushleft}[1]{\ifmeasuring@#1\else\omit$\displaystyle#1$\hfill\fi\ignorespaces}
 
@@ -47,6 +48,97 @@
 \tableofcontents
 
 \section{Introduction}
+\begin{center}
+\;\vdots
+\end{center}
+
+\section{Image comparison}
+Most meme formats work by taking one or several images, arranging them in a particular order and then adding text. This raises the question ``When are two memes actually the same meme?'' It is not enough to just compare two images pixel by pixel because in that case we'd ignore the editing part. Even screenshots can add artifacts which are almost invisible to the naked eye but change the pixels. Because of that it is necessary to define some distance function $D$ and a threshold $\lambda_{\text{thres}} > 0$, such that we accept two images $X$ and $Y$ as equal if $D(X, Y) < \lambda_{\text{thres}}$. This section deals with the construction of $D$ and some caveats regarding the implementation of the algorithm which calculates $D$. In later sections we discuss some real world examples and potential problems and limitations.
+
+\subsection{Imagespace $S$ and representation of an image}
+We model a RGB image (or RGBA image) of size width $\times$ height as an element from $[0, 1]^{\text{width} \times\text{height} \times 3}$ (or from $[0, 1]^{\text{width} \times\text{height} \times 4}$). That way actual images in raw formats can be trivially converted. For technical reason which become clearer later we embed our set of all images in a vector space $s_\text{RGB(A)}$:
+\begin{align}
+&x \in s_n :\Leftrightarrow x_{ijk} \in \mathbb R,\ i, j \in \mathbb Z,\ k =1\dots n\\
+&s_\text{RGB} \equiv s_3, \ s_\text{RGBA} \equiv s_4
+\end{align}
+In the following we drop the subscript RGB(A) when it's clear what is meant.\\
+An entire image $X$ would then be represented as
+\begin{align}
+X = (x, \text{width}, \text{height}) \in s \times \mathbb N \times \mathbb N \eqqcolon S
+\end{align}
+and an image in our original representation would be equivalent to our new representation if it's equal to $\left. (x_{ij\cdot})_{i=0}^{\text{width}-1} \right.,_{j=0}^{\text{height}-1}$. In general we define two images $X$, $Y$ as equivalent if the projection of their vectors to $\mathbb R^{\text{width}\times\text{height}\times\cdot}$ are equal:
+\begin{align}
+X \sim Y :\Leftrightarrow \tilde x = \tilde y\ \text{with}\ X = (x, w, h) \in S,\ \tilde x \coloneqq \left. (x_{ij\cdot})_{i=0}^{w-1} \right.,_{j=0}^{h-1}
+\end{align}
+
+\subsection{Relevant image transformations}
+As mentioned earlier memes are usually edited images. We will discuss now how to represent some common edits on $S$.
+
+\subsubsection{Lerping $l$}
+To make things easier we first introduce a function for lerping between pixels:
+\begin{align}
+&l : s_n\times\mathbb R\times\mathbb R \to \mathbb R^n,\nonumber\\
+&l(x, t=i+\delta t, u=j+\delta u) \nonumber\\
+&\ \ \ \ \coloneqq (1-\delta u)\big( (1-\delta t)x_{ij} + \delta t x_{i+1,j} \big) + \delta u\big( (1-\delta t)x_{i,j+1} + \delta t x_{i+1,j+1} \big)\\
+&\ \ \ \text{with}\ i = \lfloor t\rfloor,\; j = \lfloor u\rfloor,\; \delta t = t - i,\; \delta u = u - j\nonumber
+\end{align}
+It is important to note that $l$ is continues and linear over $s$. We also want to note that
+\begin{align*}
+l(x,i,j) = x_{ij}\ \forall i,j\in \mathbb Z
+\end{align*}
+
+\subsubsection{Scaling $s$}
+We define scaling as linear lerping between neighbouring pixels. Most real world applications use more complicated scaling algorithms. However linear lerping is usually the first order approximation of these algorithms. Since we're only interested in performing distance measures in the end, small local errors are no big problems for us.
+\begin{align}
+&s : S\times\mathbb N\times\mathbb N \to S,\nonumber\\
+&s((x,w,h), w', h') \coloneqq \big(\big(l(x, i w/w', j h/h')\big)_{i,j \in \mathbb Z}, w', h'\big)
+\end{align}
+
+\subsubsection{Translation $t$}
+We define translation as expected.
+\begin{align}
+&t : s\times\mathbb N\times\mathbb N \to s,\ t(x, a, b)_{ij} \coloneqq x_{i+a,j+b}\ \ \forall i,j \in \mathbb Z \nonumber\\
+&t : S\times\mathbb N\times\mathbb N \to S,\ t((x,w,h), a, b) \coloneqq (t(x, a, b), w, h)
+\end{align}
+Note that translation is a group for fixed $x$:
+\begin{align}
+t(t(x, a, b), c, d) = t(x, a+c, b+d),\ t^{-1}(x, a, b) = t(x, -a, -b),\ t(x, 0, 0) = x\nonumber
+\end{align}
+and linear for fixed $a$, $b$.
+
+\subsubsection{Croping $c$}
+We define croping as expected.
+\begin{align}
+&c : S\times\mathbb N\times\mathbb N\times\mathbb N\times\mathbb N \to S,\nonumber\\
+&c((x,w,h), a, b, w', h') \coloneqq (t(x, a, b), w', h')
+\end{align}
+
+\subsubsection{Rotation $r$}
+Doing rotation right on a lattice (discrete space) is complicated. However similar to the approximations during scaling we don't care about small local errors. We perform the rotation\footnote{We assume here a right-hand coordinate system for our images, i.e. $x_{00}$ refers to the pixel in the bottom left corner, the first axis points rightwards and the second axis points upwards. In case of a left-hand coordinate system flip the sign of $\phi$.} around the center of the image:
+\begin{align}
+r :&\; S \times \mathbb R\to S,\ r((x, w, h), \phi) \coloneqq \big(\big(l(x, i_r, j_r )\big)_{ij\in \mathbb Z}, w, h\big)\\
+&\text{with}\ \begin{pmatrix} i_r \\ j_r \end{pmatrix} = \begin{pmatrix}\cos\phi & -\sin\phi \\ \sin\phi & \cos\phi \end{pmatrix} \begin{pmatrix}i-w/2 \\ j-h/2 \end{pmatrix} + \frac 12\begin{pmatrix} w \\ h \end{pmatrix}\nonumber
+\end{align}
+
+\subsubsection{General transformation $\Lambda$}
+In general an edit is done by consecutivly performing rotations, translations, scaling and croping. So in general we want to do a transformation of the form
+\begin{align*}
+X \mapsto& c(s(t(r(X, \phi), a, b), w', h'), c, d, w'', h'')\\
+=& c(s(t\big[\big( \big(l(x, i_r, j_r )\big)_{ij\in \mathbb Z}, w, h \big), a, b\big], w', h'), c, d, w'', h'')\\
+\overset {(*)}\to& c(s\big[\big( \big(l(x, i_r+a, j_r+b )\big)_{ij\in \mathbb Z}, w, h \big), w', h'\big], c, d, w'', h'')\\
+\overset {(*)}\to& c\big[\big( \big(l(x, (i_r+a)w/w', (j_r+b)h/h' )\big)_{ij\in \mathbb Z}, w', h'\big), c, d, w'', h''\big] \\
+\overset {(*)}\to& \big( \big(l(x, (i_r+a)w/w' + c, (j_r+b)h/h' + d)\big)_{ij\in \mathbb Z}, w'', h''\big) \\
+\eqqcolon& \Lambda((x, w, h), \phi, aw/w'+c, bh/h' + d, w', h', w'', h'')
+\end{align*}
+This leads to the generalized transformation
+\begin{align}
+&\Lambda : S \times \mathbb R \times \mathbb R \times \mathbb R \times \mathbb N \times \mathbb N \times \mathbb N \times \mathbb N\to S,\nonumber\\
+&\Lambda((x, w, h), \phi, a, b, w', h', w'', h'') = \big( \big(l(x, \frac w{w'}i_r + a, \frac h{h'}j_r + b)\big)_{ij\in \mathbb Z}, w'', h''\big)
+\end{align}
+The transformations $(*)$ become equalities for infinite resolution. For finite resolutions they're minimizing the error which are introduced during lerping by ``pushing'' the lerp to the end of the calculation. Since we always want to minimize the error if it can be achieved by trivial transformations we will from now on ``push'' lerps to the end without further comments.
+
+\subsection{The distance function $D$}
+We want to construct the distance function $D$ for two images $X$, $Y$ by finding the ``best'' transformations $X\overset\Lambda\mapsto X_\Lambda$ and $Y\overset\Lambda\mapsto Y_\Lambda$ such that the resulting images have the same size $w_\Lambda\times h_\Lambda$ and then measure the distance with a different distance function $\bar D(\tilde x_\Lambda, \tilde y_\Lambda | w_\Lambda, h_\Lambda)$.
 
 \include{meme-tracer-documentation-appendix}
 
